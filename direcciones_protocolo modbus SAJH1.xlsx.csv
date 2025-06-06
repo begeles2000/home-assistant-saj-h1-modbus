@@ -1,0 +1,101 @@
+,,,,,,,,,
+HEXAGESIMAL,,,,,Rate,,,,NOTAS DIEGO
+,Address,SIZE (Word),Register Name,Data Type,,Unit,Property,Register Description,
+16388,4004H,1,MPVMode,Uint16,,,R,Inverter work mode,
+16389,4005H,2,HFaultMSG,Uint32,,,R,Display board fault message,
+16391,4007H,2,MFaultMSG,Uint32,,,R,Master Controller fault message,
+16393,4009H,2,MFaultMSG2,Uint32,,,R,Master Controller fault message2,
+16395,400BH,2,SFaultMSG,Uint32,,,R,Slave Controller fault message,
+16397,400DH,2,SFaultMSG2,Uint32,,,R,Slave Controller fault message2,
+16400,4010H,1, SinkTempC, Uint16,-1,℃, R, Heat Sink Temperature,Temperatura (ºC)
+16402,4012H,1,GFCI,Int16,0,mA,R,Earth-leakage Current,
+16406,4016H,1,ISO4,UInt16,0,kΩ,R,PV ISO,
+16409,4019H,1,ConnTime,Uint16,0,s,R,Countdown to grid connection,tiempo descarga (seg)
+16433,4031H,1,RGridVolt,Uint16,-1,V,R,R Phase Grid Voltage,VOLTAGE  RED (V)
+16434,4032H,1,ROutCurr,Uint16,-2,A,R,R Phase Output Current,ROutCurr (A)
+16435,4033H,1,RGridFreq,Uint16,-2,Hz,R,R Phase Grid Frequency,Frecuencia Red (Hz)
+16436,4034H,1,RGridDCI,Int16,0,mA,R,R Phase Grid DC Component,
+16437,4035H,1,ROutPowerWatt,Uint16,0,W,R,R Phase Output Active Power,NI IDEA  consumo casa¿?
+16438,4036H,1, RGridPowerVA, Uint16,0, W, R, R Phase Grid Apparent Power,consumo casa?¿  Por encima
+16439,4037H,1,RGridPowerPF,Int16,-3,,R,R Phase Grid Power Factor,
+16454,4046H,1,RInvVolt,Uint16,-1,V,R,R Phase Inverting Voltage,
+16455,4047H,1,RInvCurr,Int16,-2,A,R,R Phase Inverting Current,
+16456,4048H,1,RInvFreq,Uint16,-2,Hz,R,R Phase Inverting Frequency,
+16457,4049H,1, RInvPowerWatt, Int16,0, W, R, R Phase Inverting Active Power,
+16458,404AH,1,RInvPowerVA,Uint16,0,VA,R,R Phase Inverting Apparent Power,
+16469,4055H,1,ROutVolt,Uint16,-1,V,R,R Phase Output Voltage,
+16470,4056H,1,ROutCurr,Uint16,-2,A,R,R Phase Output Current,
+16471,4057H,1,ROutFreq,Uint16,-2,Hz,R,R Phase Output Frequency,
+16472,4058H,1,ROutDVI,Int16,0,mV,R,R Phase Output Voltage DC Component,
+16473,4059H,1, ROutPowerWatt, Uint16,0, W, R, R Phase Output Active Power,
+16474,405AH,1,ROutPowerVA,Uint16,0,VA,R,R Phase Output Apparent Power,
+16487,4067H,1,BusVoltMaster,UInt16,-1,V,R,R Master BUS Voltage,
+16488,4068H,1,BusVoltSlave,UInt16,-1,V,R,R Slave BUS Voltage,
+16489,4069H,1,BatVolt,Uint16,-1,V,R,Battery Voltage,Battery Voltage
+16490,406AH,1,BatCurr,Int16,-2,A,R,Battery Current,Battery Current
+16491,406BH,1,BatCurr1,Int16,-2,A,R,Battery control1 Current,
+16492,406CH,1,BatCurr2,Int16,-2,A,R,Battery control2 Current,
+16493,406DH,1,BatPower,Int16,0,W,R,Battery Power da un dato similar a 16550, Battery Power  ?¿?¿
+16494,406EH,1,BatTempC,Int16,-1,℃,R,Battery Temperature,Battery Temperature
+16495,406FH,1,BatEnergyPercent,Uint16,-2,%,R,Battery energy percent,Battery energy percent
+16497,4071H,1,PV1Volt,UInt16,-1,V,R,PV1 Voltage,PV1 Voltage (v)
+16498,4072H,1,PV1Curr,UInt16,-2,A,R,PV1 Total current,PV1 Total current (A)
+16499,4073H,1,PV1Power,UInt16,0,W,R,PV1 Power,PV1 Power (w)
+16500,4074H,1,PV2Volt,UInt16,-1,V,R,PV2 Voltage,PV2 Voltage (v)
+16501,4075H,1,PV2Curr,UInt16,-2,A,R,PV2 Total current,PV2 Total current (A)
+16502,4076H,1,PV2Power,UInt16,0,W,R,PV2 Power,PV2 Power (w)
+--,,,,,,,,,
+16528,NO DEFINIDO,1,PV2Power,UInt16,0,W,R,PV TOTAL PV1+ PV2 Power,NO DEFINIDO
+--,,,,,,,,,
+16533,4095H,1,PV direction,Uint16,0,,R,PV Energy Flow Direction,
+16534,4096H,1,Battery direction,int16,0,,R,Battery Energy Flow Direction,BATTERY DIRECTION:
+16535,4097H,1,Grid direction,int16,0,,R,Grid Power Flow Direction,
+16536,4098H,1,OutPut direction,Uint16,0,,R,Energy Flow Direction ( Output to Load),
+--,,,,,,,,,
+16544, 40A0H,1, SysTotalLoadWatt, Int16,0, W, R, Total Inverting Active Power,CONSUMO (W) igual que bateria
+16545,NO DEFINIDO,?¿,?¿,int16,?¿,W,?¿,?¿,red (w) exporta por la noche
+--,,,,,,,,,
+16549,40A5H,1,TotalPVPower,Int16,0,W,R,Total Inverting Apparent Power,PV (w)
+16550,40A6H,1,TotalBatteryPower,Int16,0,W,R,Total Battery Power,BATTERY (W)
+16551,40A7H,1,TotalGridPowerWatt,Int16,0,W,R,Total Grid Power Watt,pot inv on grid casa¿?¿?
+16552,40A8H,1,TotalGridPowerVA,Int16,0,VA,R,Total Grid Power VA,
+16553,40A9H,1,TotalInvPowerWatt,Int16,0,W,R,Total Inverter Power Watt,
+16554,40AAH,1,TotalInvPowerVA,Int16,0,VA,R,Total Inverter Power VA,
+16555,40ABH,1,BackupTotalLoadPowerWatt,Uint16,0,W,R,Backup Total Load Power Watt,
+16556,40ACH,1,BackupTotalLoadPowerVA,Uint16,0,VA,R,Backup Total Load Power VA,
+16557,NO DEFINIDO,,,Int16,0,W,R,Exporta importa a red (w),Exp (w) por la noche se queda a cero
+16558,,,,,,,,,
+,,,,,,,,,
+16574,,,,,,%,,%EXPORTADO???? No parece,NI IDEA 
+16576,40BFH,2,Today PVEnergy,Uint32,-2,Kwh,R,Today's PV Generation,PV HOY (kwh) ?
+16578,40C1H,2,Month PVEnergy,Uint32,-2,Kwh,R,PV Generation of the current month,¿PV MES (kwh) ?
+16580,40C3H,2,Year PVEnergy,Uint32,-2,Kwh,R,PV Generation of the current year,PV AÑO(kwh)
+16582,40C5H,2,Total PVEnergy,Uint32,-2,Kwh,R,Total PV Generation,PV TOTAL (kwh)
+16584,40C7H,2,Today BatChgEnergy,Uint32,-2,Kwh,R,Today's Energy Used for Battery Charging,BAT CARGA HOY (kwh)
+16586,40C9H,2,Month BatChgEnergy,Uint32,-2,Kwh,R,Energy Used for Battery Charging in the current month,BAT CARGA MES (kwh)
+16588,40CBH,2,Year BatChgEnergy,Uint32,-2,Kwh,R,Energy Used for Battery Charging in the current year,BAT CARGA AÑO (kwh)
+16590,40CDH,2,Total BatChgEnergy,Uint32,-2,Kwh,R,Total Energy Used for Battery Charging,BAT CARGA TOTAL(kwh)
+16592,40CFH,2,Today BatDisEnergy,Uint32,-2,Kwh,R,Today's Energy Discharged by Battery,BAT DESCARGA HOY (kwh)
+16594,40D1H,2,Month BatDisEnergy,Uint32,-2,kwh,R,Energy Discharged by Battery in the current month,BAT DESCARGA MES (kwh)
+16596,40D3H,2,Year BatDisEnergy,Uint32,-2,Kwh,R,Energy Discharged by Battery in the current year,BAT DESCARGA AÑO (kwh)
+16598,40D5H,2,Total BatDisEnergy,Uint32,-2,Kwh,R,Total Energy Discharged by Battery,BAT DESCARGA TOTAL (kwh)
+16600,40DFH,2,Today TotalLoadEnergy,Uint32,-2,Kwh,R,Load Power Consumption of today, LOAD POWER HOY (kwh)
+16602,40E1H,2,Month TotalLoadEnergy,Uint32,-2,Kwh,R,Load Power Consumption of the month, LOAD POWER MES (kwh)
+16604,40E3H,2,Year TotalLoadEnergy,Uint32,-2,Kwh,R,Load Power Consumption of the year, LOAD POWER AÑO (kwh)
+16606,40E5H,2,Total TotalLoadEnergy,Uint32,-2,Kwh,R,Total Load Power Consumption, LOAD POWER TOTAL (kwh)
+16608,40E7H,2,Today BackupLoadEnergy,Uint32,-2,Kwh,R,Today’s Backup Load Energy,CONSUMO HOY (kwh)
+16610,40E9H,2,Month BackupLoadEnergy,Uint32,-2,Kwh,R,Backup Load Energy in the current month,CONSUMO  MES (kwh)
+16612,40EBH,2,Year BackupLoadEnergy,Uint32,-2,Kwh,R,Backup Load Energy in the current year,CONSUMO  AÑO(kwh)
+16614,40EDH,2,Total BackupLoadEnergy,Uint32,-2,Kwh,R,Total Backup Load Energy,CONSUMO TOTAL (kwh)
+16616,,,,,,,,,
+16618,,,,,,,,,
+16620,,,,,,,,,
+16622,,,,,,,,,
+16624,40EFH,2,Today SellEnergy,Uint32,-2,kwh,R,Power Export to the Grid today,EXP HOY (kwh)
+16626,40F1H,2,Month SellEnergy,Uint32,-2,Kwh,R,Power Export to the Grid in the current month,EXP MES (kwh)
+16628,40F3H,2,Year SellEnergy,Uint32,-2,Kwh,R,Power Export to the Grid in the current year,EXP AÑO (kwh)
+16630,40F5H,2,Total SellEnergy,Uint32,-2,Kwh,R,Total Power Export to the Grid,EXP TOTAL (kwh)
+16632,40F7H,2,Today FeedInEnergy,Uint32,-2,Kwh,R,Power Imported from the Grid of today,IMP HOY (kwh)
+16634,40F9H,2,Month FeedInEnergy,Uint32,-2,Kwh,R,Power Imported from the Grid in the current month,IMP MES (kwh)
+16636,40FBH,2,Year FeedInEnergy,Uint32,-2,Kwh,R,Power Imported from the Grid in the current year,IMP AÑO (kwh)
+16638,40FDH,2,Total FeedInEnergy,Uint32,-2,Kwh,R,Total Power Imported from the Grid,IMP TOTAL (kwh)

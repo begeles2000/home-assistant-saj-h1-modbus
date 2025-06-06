@@ -149,11 +149,21 @@ async def read_modbus_realtime_data(client: ModbusClient) -> DataDict:
 async def read_additional_modbus_data_1_part_1(client: ModbusClient) -> DataDict:
     """Reads the first part of additional operating data (Set 1), up to sensor pv4Power."""
     decode_instructions_part_1 = [
-        ("BatTemp", "16i", 0.1), ("batEnergyPercent", None), (None, "skip_bytes", 2),
-        ("pv1Voltage", None, 0.1), ("pv1TotalCurrent", None), ("pv1Power", None, 1),
-        ("pv2Voltage", None, 0.1), ("pv2TotalCurrent", None), ("pv2Power", None, 1),
-        ("pv3Voltage", None, 0.1), ("pv3TotalCurrent", None), ("pv3Power", None, 1),
-        ("pv4Voltage", None, 0.1), ("pv4TotalCurrent", None), ("pv4Power", None, 1),
+        ("BatTemp", "16i", 0.1),         # 406FH - Battery Temperature with 0.1 scale
+        ("batEnergyPercent", None, 0.01), # 4070H - Battery energy percent with 0.01 scale
+        (None, "skip_bytes", 2),
+        ("pv1Voltage", None, 0.1),       # 4071H - PV1 Voltage with 0.1 scale
+        ("pv1TotalCurrent", None, 0.01), # 4072H - PV1 Current with 0.01 scale
+        ("pv1Power", None),              # 4073H - PV1 Power no scaling
+        ("pv2Voltage", None, 0.1),       # 4074H - PV2 Voltage with 0.1 scale
+        ("pv2TotalCurrent", None, 0.01), # 4075H - PV2 Current with 0.01 scale
+        ("pv2Power", None),              # 4076H - PV2 Power no scaling
+        ("pv3Voltage", None, 0.1),       # 4077H - PV3 Voltage with 0.1 scale
+        ("pv3TotalCurrent", None, 0.01), # 4078H - PV3 Current with 0.01 scale
+        ("pv3Power", None),              # 4079H - PV3 Power no scaling
+        ("pv4Voltage", None, 0.1),       # 407AH - PV4 Voltage with 0.1 scale
+        ("pv4TotalCurrent", None, 0.01), # 407BH - PV4 Current with 0.01 scale
+        ("pv4Power", None),              # 407CH - PV4 Power no scaling
     ]
 
     return await _read_modbus_data(client, 16494, 15, decode_instructions_part_1, 'additional_data_1_part_1', default_factor=0.01)
@@ -220,15 +230,27 @@ async def read_additional_modbus_data_3(client: ModbusClient) -> DataDict:
 async def read_additional_modbus_data_4(client: ModbusClient) -> DataDict:
     """Reads data for grid parameters (R, S, and T phase)."""
     decode_instructions = [
-        ("RGridVolt", None, 0.1), ("RGridCurr", "16i", 0.01), ("RGridFreq", None, 0.01),
-        ("RGridDCI", "16i"), ("RGridPowerWatt", "16i", 1),
-        ("RGridPowerVA", None, 1), ("RGridPowerPF", "16i"),
-        ("SGridVolt", None, 0.1), ("SGridCurr", "16i", 0.01), ("SGridFreq", None, 0.01),
-        ("SGridDCI", "16i"), ("SGridPowerWatt", "16i", 1),
-        ("SGridPowerVA", None, 1), ("SGridPowerPF", "16i"),
-        ("TGridVolt", None, 0.1), ("TGridCurr", "16i", 0.01), ("TGridFreq", None, 0.01),
-        ("TGridDCI", "16i"), ("TGridPowerWatt", "16i", 1),
-        ("TGridPowerVA", None, 1), ("TGridPowerPF", "16i"),
+        ("RGridVolt", None, 0.1),        # 4031H - Voltage scale factor 0.1
+        ("RGridCurr", None, 0.01),       # 4032H - Current scale factor 0.01
+        ("RGridFreq", None, 0.01),       # 4033H - Frequency scale factor 0.01
+        ("RGridDCI", "16i"),             # 4034H - DC component
+        ("RGridPowerWatt", None),        # 4035H - No scaling needed for power
+        ("RGridPowerVA", None),          # 4036H - No scaling needed for VA
+        ("RGridPowerPF", "16i", 0.001),  # 4037H - Power Factor scale 0.001
+        ("SGridVolt", None, 0.1),        # 4038H - Voltage scale factor 0.1
+        ("SGridCurr", None, 0.01),       # 4039H - Current scale factor 0.01
+        ("SGridFreq", None, 0.01),       # 403AH - Frequency scale factor 0.01
+        ("SGridDCI", "16i"),             # 403BH - DC component
+        ("SGridPowerWatt", None),        # 403CH - No scaling needed for power
+        ("SGridPowerVA", None),          # 403DH - No scaling needed for VA
+        ("SGridPowerPF", "16i", 0.001),  # 403EH - Power Factor scale 0.001
+        ("TGridVolt", None, 0.1),        # 403FH - Voltage scale factor 0.1
+        ("TGridCurr", None, 0.01),       # 4040H - Current scale factor 0.01
+        ("TGridFreq", None, 0.01),       # 4041H - Frequency scale factor 0.01
+        ("TGridDCI", "16i"),             # 4042H - DC component
+        ("TGridPowerWatt", None),        # 4043H - No scaling needed for power
+        ("TGridPowerVA", None),          # 4044H - No scaling needed for VA
+        ("TGridPowerPF", "16i", 0.001),  # 4045H - Power Factor scale 0.001
     ]
     
     return await _read_modbus_data(client, 16433, 21, decode_instructions, "grid_phase_data", default_factor=0.001)
