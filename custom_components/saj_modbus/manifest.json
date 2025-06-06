@@ -1,12 +1,12 @@
 {
   "domain": "saj_modbus",
-  "name": "SAJ H2 Modbus",
+  "name": "SAJ H1 Modbus",
   "codeowners": ["@stan74"],
   "config_flow": true,
   "dependencies": [], 
-  "documentation": "https://github.com/stanus74/home-assistant-saj-h2-modbus",
+  //"documentation": "https://github.com/stanus74/home-assistant-saj-h2-modbus",
   "iot_class": "local_polling",
-  "issue_tracker": "https://github.com/stanus74/home-assistant-saj-h2-modbus/issues",
+  //"issue_tracker": "https://github.com/stanus74/home-assistant-saj-h2-modbus/issues",
   "requirements": ["pymodbus>=3.6.9"],
   "version": "1.8.0"
 }
