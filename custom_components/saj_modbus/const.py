@@ -37,7 +37,7 @@ class SensorGroup:
     
 @dataclass
 class SajModbusSensorEntityDescription(SensorEntityDescription):
-    """A class that describes SAJ H2 sensor entities."""
+    """A class that describes SAJ H1 sensor entities."""
 
 
 power_sensors_group = SensorGroup(
