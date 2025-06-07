@@ -4,9 +4,9 @@
   "codeowners": ["@begeles2000"],
   "config_flow": true,
   "dependencies": [], 
-  //"documentation": "https://github.com/begeles2000/home-assistant-saj-h1-modbus",
+  "documentation": "https://github.com/begeles2000/home-assistant-saj-h1-modbus",
   "iot_class": "local_polling",
-  //"issue_tracker": "https://github.com/begeles2000/home-assistant-saj-h1-modbus/issues",
+  "issue_tracker": "https://github.com/begeles2000/home-assistant-saj-h1-modbus/issues",
   "requirements": ["pymodbus>=3.6.9"],
   "version": "1.8.0"
 }
