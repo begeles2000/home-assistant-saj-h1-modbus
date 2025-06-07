@@ -256,25 +256,18 @@ async def read_additional_modbus_data_4(client: ModbusClient) -> DataDict:
     return await _read_modbus_data(client, 16433, 21, decode_instructions, "grid_phase_data", default_factor=0.001)
 
 async def read_battery_data(client: ModbusClient) -> DataDict:
-    """Reads battery data from registers 40960 to 41015."""
+    """Reads battery data from registers for SAJ H1 inverter."""
     decode_instructions = [
-        ("BatNum", None, 1), ("BatCapcity", None, 1), ("Bat1FaultMSG", None, 1), ("Bat1WarnMSG", None, 1),
-        ("Bat2FaultMSG", None, 1), ("Bat2WarnMSG", None, 1), ("Bat3FaultMSG", None, 1), ("Bat3WarnMSG", None, 1),
-        ("Bat4FaultMSG", None, 1), ("Bat4WarnMSG", None, 1), ("BatUserCap", None, 1), ("BatOnline", None, 1),
-        ("Bat1SOC", None), ("Bat1SOH", None), ("Bat1Voltage", None, 0.1), ("Bat1Current", "16i"),
-        ("Bat1Temperature", "16i", 0.1), ("Bat1CycleNum", None, 1), ("Bat2SOC", None), ("Bat2SOH", None),
-        ("Bat2Voltage", None, 0.1), ("Bat2Current", "16i"), ("Bat2Temperature", "16i", 0.1),
-        ("Bat2CycleNum", None, 1), ("Bat3SOC", None), ("Bat3SOH", None), ("Bat3Voltage", None, 0.1),
-        ("Bat3Current", "16i"), ("Bat3Temperature", "16i", 0.1), ("Bat3CycleNum", None, 1),
-        ("Bat4SOC", None), ("Bat4SOH", None), ("Bat4Voltage", None, 0.1), ("Bat4Current", "16i"),
-        ("Bat4Temperature", "16i", 0.1), ("Bat4CycleNum", None, 1), (None, "skip_bytes", 12),
-        ("Bat1DischarCapH", None, 1), ("Bat1DischarCapL", None, 1), ("Bat2DischarCapH", None, 1), ("Bat2DischarCapL", None, 1),
-        ("Bat3DischarCapH", None, 1), ("Bat3DischarCapL", None, 1), ("Bat4DischarCapH", None, 1), ("Bat4DischarCapL", None, 1),
-        ("BatProtHigh", None, 0.1), ("BatProtLow", None, 0.1), ("Bat_Chargevoltage", None, 0.1), ("Bat_DisCutOffVolt", None, 0.1),
-        ("BatDisCurrLimit", None, 0.1), ("BatChaCurrLimit", None, 0.1),
+        ("BatVolt", None, 0.1),         # 406AH - Battery Voltage with 0.1 scale
+        ("BatCurr", "16i", 0.01),       # 406BH - Battery Current with 0.01 scale
+        ("BatCurr1", "16i", 0.01),      # 406CH - Battery control1 Current
+        ("BatCurr2", "16i", 0.01),      # 406DH - Battery control2 Current
+        ("BatPower", "16i"),            # 406EH - Battery Power
+        ("BatTempC", "16i", 0.1),       # 406FH - Battery Temperature with 0.1 scale
+        ("BatEnergyPercent", None, 0.01) # 4070H - Battery energy percent with 0.01 scale
     ]
     
-    return await _read_modbus_data(client, 40960, 56, decode_instructions, 'battery_data', default_factor=0.01)
+    return await _read_modbus_data(client, 16489, 7, decode_instructions, 'battery_data', default_factor=1)
 
 async def read_first_charge_data(client: ModbusClient) -> DataDict:
     """Reads the First Charge registers using the generic read_modbus_data function."""
