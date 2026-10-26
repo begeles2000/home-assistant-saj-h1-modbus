@@ -35,5 +35,24 @@
         }
       }
     }
+  },
+  "entity": {
+    "select": {
+      "battery_mode": {
+        "name": "Modo batería",
+        "state": {
+          "self_use": "Autoconsumo",
+          "standby": "Reposo (conservar batería)",
+          "grid_charge": "Cargar de red",
+          "grid_discharge": "Descargar a red",
+          "time_of_use": "Franjas Time-of-use"
+        }
+      }
+    },
+    "number": {
+      "battery_mode_power": {
+        "name": "Potencia modo batería"
+      }
+    }
   }
 }

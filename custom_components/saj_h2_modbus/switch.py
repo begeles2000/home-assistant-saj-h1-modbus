@@ -14,7 +14,10 @@ from .hub import SAJModbusHub
 _LOGGER = logging.getLogger(__name__)
 
 PASSIVE_SWITCH_KEYS = {"passive_charge", "passive_discharge"}
-# 0x3636 target values depend on the inverter model: see hub.passive_mode_targets
+PASSIVE_MODE_TARGETS = {
+    "passive_charge": 2,
+    "passive_discharge": 1,
+}
 PASSIVE_MODE_PENDING_ATTR = "_pending_passive_mode_state"
 
 SWITCH_DEFINITIONS = [
@@ -109,7 +112,7 @@ class BaseSajSwitch(CoordinatorEntity, SwitchEntity, SajBaseEntity):
                 passive_state = data.get("passive_charge_enable")
                 if passive_state is None:
                     return False
-                return passive_state == self._hub.passive_mode_targets[self._switch_type]
+                return passive_state == PASSIVE_MODE_TARGETS[self._switch_type]
 
         except Exception as e:
             _LOGGER.warning("Error getting %s state: %s", self._switch_type, e)
@@ -184,9 +187,7 @@ class BaseSajSwitch(CoordinatorEntity, SwitchEntity, SajBaseEntity):
         if hub_method is None:
             _LOGGER.error("Passive mode control not supported by hub")
             return False
-        target_value = (
-            self._hub.passive_mode_targets[self._switch_type] if desired_state else 0
-        )
+        target_value = PASSIVE_MODE_TARGETS[self._switch_type] if desired_state else 0
         await hub_method(target_value)
         return True
 

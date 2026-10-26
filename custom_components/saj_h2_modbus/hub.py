@@ -137,9 +137,17 @@ _READER_GROUPS = [
     [modbus_readers.read_charge_data, modbus_readers.read_discharge_data],
 ]
 
-# H1 series: same groups plus the real AppMode register, read last so it
-# overrides the 0x3647 value from the passive block.
-_READER_GROUPS_H1 = _READER_GROUPS + [[modbus_readers.read_h1_app_mode_data]]
+# H1 series: passive powers decoded as watts, plus the real AppMode register,
+# read last so it overrides the 0x3647 value from the passive block.
+_READER_GROUPS_H1 = [
+    [
+        modbus_readers.read_passive_battery_data_h1
+        if method is modbus_readers.read_passive_battery_data
+        else method
+        for method in group
+    ]
+    for group in _READER_GROUPS
+] + [[modbus_readers.read_h1_app_mode_data]]
 
 
 class SAJModbusHub(DataUpdateCoordinator[dict[str, Any]]):
@@ -288,6 +296,8 @@ class SAJModbusHub(DataUpdateCoordinator[dict[str, Any]]):
         self._pending_charging_state = None
         self._pending_discharging_state = None
         self._pending_passive_mode_state = None
+        # Power (W) for the H1 battery mode select; restored by its number entity
+        self.battery_mode_power = models.DEFAULT_BATTERY_MODE_POWER_W
         self._setting_handler = ChargeSettingHandler(self)
         self.use_ha_mqtt = use_ha_mqtt
 
@@ -343,12 +353,23 @@ class SAJModbusHub(DataUpdateCoordinator[dict[str, Any]]):
         """True when the connected inverter is an H1 series device."""
         return models.is_h1(self.inverter_data)
 
-    @property
-    def passive_mode_targets(self) -> dict[str, int]:
-        """0x3636 values for the passive charge/discharge switches."""
-        if self.is_h1:
-            return models.PASSIVE_MODE_TARGETS_H1
-        return models.PASSIVE_MODE_TARGETS_H2
+    async def set_battery_mode(self, mode: str) -> None:
+        """Switch the H1 battery mode (see models.BATTERY_MODES)."""
+        self._setting_handler.set_battery_mode(mode, self.battery_mode_power)
+
+    async def set_battery_mode_power(self, power: int) -> None:
+        """Set the power used by the grid charge/discharge battery modes.
+
+        Re-applies the current mode when it is power-driven, so the new value
+        takes effect immediately.
+        """
+        self.battery_mode_power = int(power)
+        mode = models.battery_mode_from_data(self.inverter_data)
+        if mode in (
+            models.BATTERY_MODE_GRID_CHARGE,
+            models.BATTERY_MODE_GRID_DISCHARGE,
+        ):
+            await self.set_battery_mode(mode)
 
     async def process_pending_now(self) -> None:
         """Immediately process pending settings."""

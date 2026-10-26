@@ -35,5 +35,24 @@
         }
       }
     }
+  },
+  "entity": {
+    "select": {
+      "battery_mode": {
+        "name": "Battery Mode",
+        "state": {
+          "self_use": "Self-use",
+          "standby": "Standby (hold battery)",
+          "grid_charge": "Charge from grid",
+          "grid_discharge": "Discharge to grid",
+          "time_of_use": "Time-of-use schedule"
+        }
+      }
+    },
+    "number": {
+      "battery_mode_power": {
+        "name": "Battery Mode Power"
+      }
+    }
   }
 }

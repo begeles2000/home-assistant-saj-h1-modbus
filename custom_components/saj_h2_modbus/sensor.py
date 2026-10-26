@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import logging
 
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import UnitOfPower
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
+from . import models
 from .const import SENSOR_TYPES, SajModbusSensorEntityDescription
 from .entity import SajBaseEntity
 from .hub import SAJModbusHub, FAST_POLL_SENSORS, ADVANCED_LOGGING
@@ -27,6 +30,11 @@ async def async_setup_entry(
 
     entities = []
     for description in SENSOR_TYPES.values():
+        if hub.is_h1 and description.key in models.H1_PASSIVE_POWER_KEYS:
+            # H1 passive powers are watts (H2: per-mille shown as %)
+            description = dataclasses.replace(
+                description, native_unit_of_measurement=UnitOfPower.WATT
+            )
         if description.key in FAST_POLL_SENSORS:
             # Create BOTH entities for fast-poll sensors:
             # 1. Normal entity (60s, with DB recording)

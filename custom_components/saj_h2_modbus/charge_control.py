@@ -183,6 +183,7 @@ class CommandType(Enum):
     DISCHARGING_STATE = "discharging_state"
     PASSIVE_MODE = "passive_mode"
     SIMPLE_SETTING = "simple_setting"
+    BATTERY_MODE = "battery_mode"
 
 
 @dataclass
@@ -231,6 +232,7 @@ class ChargeSettingHandler:
             CommandType.PASSIVE_MODE: lambda p: self._handle_passive_mode(
                 p.get("value")
             ),
+            CommandType.BATTERY_MODE: self._handle_battery_mode,
         }
 
     # ========== QUEUE MANAGEMENT ==========
@@ -592,6 +594,75 @@ class ChargeSettingHandler:
             # Force UI update to clear pending flag and show new state
             self._schedule_flush()
 
+    async def _handle_battery_mode(self, payload: dict) -> None:
+        """Apply an H1 battery mode as one ordered write sequence.
+
+        Passive powers are written before 0x3636/AppMode, and the opposite
+        direction's powers are zeroed: on the H1 a non-zero discharge power
+        makes the inverter discharge even with 0x3636 = charge.
+        """
+        mode = payload.get("mode")
+        power = int(payload.get("power", 0))
+        power = max(0, min(power, models.H1_PASSIVE_POWER_MAX_W))
+        if not self.hub.is_h1:
+            _LOGGER.warning("Battery mode is only supported on SAJ H1 inverters")
+            return
+
+        writes: list[tuple[str, int]]
+        if mode == models.BATTERY_MODE_SELF_USE:
+            app_mode, writes = models.APP_MODE_SELF_USE, []
+        elif mode == models.BATTERY_MODE_TIME_OF_USE:
+            app_mode, writes = models.APP_MODE_TIME_OF_USE, []
+        elif mode == models.BATTERY_MODE_STANDBY:
+            app_mode = models.APP_MODE_PASSIVE
+            writes = [("passive_charge_enable", models.PASSIVE_STANDBY)]
+        elif mode == models.BATTERY_MODE_GRID_CHARGE:
+            app_mode = models.APP_MODE_PASSIVE
+            writes = [
+                ("passive_grid_discharge_power", 0),
+                ("passive_bat_discharge_power", 0),
+                ("passive_grid_charge_power", power),
+                ("passive_bat_charge_power", power),
+                ("passive_charge_enable", models.PASSIVE_CHARGE),
+            ]
+        elif mode == models.BATTERY_MODE_GRID_DISCHARGE:
+            app_mode = models.APP_MODE_PASSIVE
+            writes = [
+                ("passive_grid_charge_power", 0),
+                ("passive_bat_charge_power", 0),
+                ("passive_grid_discharge_power", power),
+                ("passive_bat_discharge_power", power),
+                ("passive_charge_enable", models.PASSIVE_DISCHARGE),
+            ]
+        else:
+            _LOGGER.error("Unknown battery mode: %s", mode)
+            return
+
+        if app_mode != models.APP_MODE_PASSIVE:
+            # Leave passive first so the inverter never runs the old passive
+            # command under the new mode; 0x3636 is cleared afterwards.
+            writes = [("app_mode", app_mode), ("passive_charge_enable", 0)]
+        else:
+            writes.append(("app_mode", app_mode))
+
+        updates: dict[str, Any] = {}
+        for key, value in writes:
+            setting_def = self._simple_setting(key)
+            label = f"battery mode {mode}: {setting_def['label']}"
+            if not await self._write_register_with_backoff(
+                setting_def["address"], value, label
+            ):
+                _LOGGER.error(
+                    "Battery mode %s aborted: writing %s failed", mode, key
+                )
+                break
+            updates["AppMode" if key == "app_mode" else key] = value
+        if updates:
+            # Mode changes made here must not be undone by the passive switch
+            # restore logic.
+            self._app_mode_before_passive = None
+            await self._update_cache(updates)
+
     async def _activate_passive_mode(self) -> None:
         """Activate passive mode by capturing current app mode and setting to passive."""
         self._capture_app_mode_before_passive()
@@ -939,6 +1010,12 @@ class ChargeSettingHandler:
         """Set the discharging state."""
         self._set_state_with_pending(
             "discharging", CommandType.DISCHARGING_STATE, value
+        )
+
+    def set_battery_mode(self, mode: str, power: int) -> None:
+        """Queue an H1 battery mode change."""
+        self._queue_command_async(
+            Command(CommandType.BATTERY_MODE, {"mode": mode, "power": power})
         )
 
     def set_passive_mode(self, value: int | None) -> None:

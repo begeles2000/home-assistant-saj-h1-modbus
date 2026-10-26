@@ -20,16 +20,37 @@
 > |---|---|---|
 > | Detection | — | Automatic: device type `0x54` (register `0x8F00`) or serial number starting with `H1` |
 > | AppMode read/write | `0x3647` | `0x3247` (0 Self-use, 1 Time-of-use, 2 Backup, 3 Passive) |
-> | Passive Charge / Discharge switch (`0x3636`) | 2 / 1 | 1 / 2 (as in the SAJ protocol; 2 verified to discharge) |
+> | Passive mode `0x3636` | 0 standby, 1 discharge, 2 charge | same values (the SAJ protocol PDF has 1/2 swapped) |
+> | Passive powers `0x3637`-`0x363A` | per-mille of rated power (shown as %) | **watts** (shown as W, max 5000) |
 > | Discharge depths, battery/grid power limits (`0x3644`-`0x3646`, `0x364D`-`0x3650`) | writable | writes refused (registers unused on H1) |
+> | **Battery Mode** select + **Battery Mode Power** number | — | new, see below |
 > | Device model shown | SAJ H2 | SAJ H1 |
 >
 > The domain (`saj_h2_modbus`) and all entity unique IDs are kept, so existing entities, dashboards and
 > automations keep working when replacing the upstream integration with this fork.
 >
-> **Status / still to verify on H1:** `0x3636 = 1` actually charging the battery; whether passive powers
-> (`0x3637`-`0x363A`) are watts on H1 (upstream treats them as per-mille of rated power); one AIO3 module locked
-> up (Modbus exception 2 on every register until power-cycled) right after switching to passive mode.
+> ### Battery Mode (H1 only)
+>
+> `select.saj_battery_mode` sets what the battery does with one entity, writing all registers in a safe order.
+> `number.saj_battery_mode_power` (W, kept by Home Assistant) is the power for grid charge/discharge; changing it
+> while charging/discharging applies it immediately.
+>
+> | Option | Writes | Effect (verified on H1-5K-S2) |
+> |---|---|---|
+> | `self_use` | AppMode 0, `0x3636` 0 | Normal self-consumption |
+> | `standby` | `0x3636` 0, AppMode 3 | Battery neither charges nor discharges; house (and EV) run from PV/grid |
+> | `grid_charge` | discharge powers 0, charge powers = P, `0x3636` 2, AppMode 3 | Battery charges from the grid at ~P W |
+> | `grid_discharge` | charge powers 0, discharge powers = P, `0x3636` 1, AppMode 3 | Battery discharges at P W (surplus exported) |
+> | `time_of_use` | AppMode 1, `0x3636` 0 | Follows the charge/discharge time slots configured in the integration |
+>
+> **Important:** on the H1 the opposite direction's passive powers must be 0. With `0x3638`/`0x363A` set, the inverter
+> discharged even with `0x3636 = 2` (charge). The battery mode select takes care of this.
+>
+> Stopping a grid charge at a target SOC is up to your automation (switch back to `self_use` or `standby`); the
+> inverter has no failsafe and stays in the last mode written.
+>
+> **Known issue:** one AIO3 module locked up (Modbus exception 2 on every register until power-cycled) while two
+> Modbus clients were connected.
 >
 > **Only one Modbus TCP client at a time:** the AIO3 module mixes responses between simultaneous clients and
 > rejects the second one. Do not run this integration together with another Modbus client (YAML hub, scripts, ...).

@@ -9,6 +9,7 @@ from pymodbus.client.mixin import ModbusClientMixin
 from asyncio import Lock
 
 from .const import DEVICE_STATUSSES, FAULT_MESSAGES
+from .models import H1_PASSIVE_POWER_KEYS
 from .modbus_utils import (
     try_read_registers,
     ReconnectionNeededError,
@@ -952,13 +953,35 @@ async def read_discharge_data(client: ModbusTcpClient, lock: Lock) -> DataDict:
 
 async def read_passive_battery_data(client: ModbusTcpClient, lock: Lock) -> DataDict:
     """Reads passive battery and anti-reflux data with mode decoding."""
+    return await _read_passive_battery_block(client, lock, PASSIVE_BATTERY_DATA_MAP)
+
+
+# H1: the passive powers (0x3637-0x363A) are plain watts, not per-mille.
+PASSIVE_BATTERY_DATA_MAP_H1 = [
+    (key, decoder, 1) if key in H1_PASSIVE_POWER_KEYS else (key, decoder, *rest)
+    for key, decoder, *rest in PASSIVE_BATTERY_DATA_MAP
+]
+
+
+async def read_passive_battery_data_h1(
+    client: ModbusTcpClient, lock: Lock
+) -> DataDict:
+    """Reads passive battery and anti-reflux data on H1 inverters (powers in W)."""
+    return await _read_passive_battery_block(
+        client, lock, PASSIVE_BATTERY_DATA_MAP_H1
+    )
+
+
+async def _read_passive_battery_block(
+    client: ModbusTcpClient, lock: Lock, decode_map: list[tuple]
+) -> DataDict:
     try:
         data, errors = await _read_modbus_data(
             client,
             lock,
             0x3636,
             43,
-            PASSIVE_BATTERY_DATA_MAP,
+            decode_map,
             "passive_battery_anti_reflux_data",
             default_factor=0.1,
         )
