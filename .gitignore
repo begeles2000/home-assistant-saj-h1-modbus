@@ -7,3 +7,5 @@
 /graphify-out/
 # Added by code-review-graph
 .code-review-graph/
+__pycache__/
+h1-tools/*.json

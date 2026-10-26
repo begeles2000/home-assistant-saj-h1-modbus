@@ -203,4 +203,5 @@ def _update_device_info_from_inverter_data(hub: SAJModbusHub) -> None:
 
     model = data.get("devtype")
     if model is not None:
-        hub.device_info["model"] = f"SAJ H2 ({model})"
+        family = "H1" if hub.is_h1 else "H2"
+        hub.device_info["model"] = f"SAJ {family} ({model})"

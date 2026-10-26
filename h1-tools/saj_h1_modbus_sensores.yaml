@@ -1,0 +1,118 @@
+# =====================================================================
+# SAJ H1-5K-S2 - Registros de CONTROL (lectura) para el hub Modbus nativo
+# ---------------------------------------------------------------------
+# PEGAR dentro de tu hub modbus EXISTENTE (no crear un segundo hub con la
+# misma IP: el modulo AIO3/WiFi admite muy pocas conexiones Modbus TCP y
+# dos clientes simultaneos provocan timeouts y escrituras que "no entran").
+#
+# Direcciones en decimal (HA no acepta 0x...):
+#   0x3247 = 12871  AppMode           0=SELF_USE 1=TIME_OF_USE 2=BACKUP 3=PASSIVE
+#   0x3248 = 12872  GridChargePowerLimit (W)
+#   0x3273 = 12915  BatSetSOC_H (%)
+#   0x3274 = 12916  BatSetSOC_L (%)
+#   0x3604 = 13828  Mascara franjas de carga (bit0 = franja 1)
+#   0x3605 = 13829  Mascara franjas de descarga
+#   0x3636 = 13878  Passive mode      0=STANDBY 1=CHARGE 2=DISCHARGE  (*)
+#   0x3637 = 13879  Passive grid charge power (W)
+#   0x3638 = 13880  Passive grid discharge power (W)
+#   0x406F = 16495  SOC bateria (x0.01 %)
+#
+# (*) Mapeo del PDF de SAJ. ha-saj-h1-mqtt v2.1.1 los tiene invertidos,
+#     pero en este H1-5K-S2 el valor 2 descargo la bateria exportando
+#     ~500 W a red (prueba 26/10/2026). Pendiente confirmar 1 = carga.
+# =====================================================================
+
+# --- dentro de:  modbus: - name: <tu_hub> ... sensors: ---
+sensors:
+  - name: SAJ App Mode raw
+    unique_id: saj_h1_app_mode_raw
+    slave: 1
+    address: 12871
+    input_type: holding
+    data_type: uint16
+    scan_interval: 30
+
+  - name: SAJ Passive Mode raw
+    unique_id: saj_h1_passive_mode_raw
+    slave: 1
+    address: 13878
+    input_type: holding
+    data_type: uint16
+    scan_interval: 30
+
+  - name: SAJ Passive Grid Charge Power
+    unique_id: saj_h1_passive_charge_power
+    slave: 1
+    address: 13879
+    input_type: holding
+    data_type: uint16
+    unit_of_measurement: W
+    device_class: power
+    scan_interval: 60
+
+  - name: SAJ Passive Grid Discharge Power
+    unique_id: saj_h1_passive_discharge_power
+    slave: 1
+    address: 13880
+    input_type: holding
+    data_type: uint16
+    unit_of_measurement: W
+    device_class: power
+    scan_interval: 60
+
+  - name: SAJ Grid Charge Power Limit
+    unique_id: saj_h1_grid_charge_power_limit
+    slave: 1
+    address: 12872
+    input_type: holding
+    data_type: uint16
+    unit_of_measurement: W
+    scan_interval: 300
+
+  - name: SAJ Bat SOC High
+    unique_id: saj_h1_bat_soc_high
+    slave: 1
+    address: 12915
+    input_type: holding
+    data_type: uint16
+    unit_of_measurement: "%"
+    scan_interval: 300
+
+  - name: SAJ Bat SOC Low
+    unique_id: saj_h1_bat_soc_low
+    slave: 1
+    address: 12916
+    input_type: holding
+    data_type: uint16
+    unit_of_measurement: "%"
+    scan_interval: 300
+
+  - name: SAJ Charge Slots Mask
+    unique_id: saj_h1_charge_slots_mask
+    slave: 1
+    address: 13828
+    input_type: holding
+    data_type: uint16
+    scan_interval: 300
+
+  - name: SAJ Discharge Slots Mask
+    unique_id: saj_h1_discharge_slots_mask
+    slave: 1
+    address: 13829
+    input_type: holding
+    data_type: uint16
+    scan_interval: 300
+
+  # Si ya tienes el SOC definido, omite este bloque y ajusta el entity_id
+  # sensor.saj_battery_soc en el paquete de control.
+  - name: SAJ Battery SOC
+    unique_id: saj_h1_battery_soc
+    slave: 1
+    address: 16495
+    input_type: holding
+    data_type: uint16
+    scale: 0.01
+    precision: 1
+    unit_of_measurement: "%"
+    device_class: battery
+    scan_interval: 30

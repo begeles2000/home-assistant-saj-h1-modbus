@@ -1,0 +1,180 @@
+# =====================================================================
+# SAJ H1-5K-S2 - Paquete de control de bateria (Modbus nativo de HA)
+# ---------------------------------------------------------------------
+# Instalar como paquete:
+#   configuration.yaml ->  homeassistant:
+#                            packages: !include_dir_named packages
+#   copiar este fichero a /config/packages/saj_h1_control.yaml
+#
+# Requiere los sensores de saj_h1_modbus_sensores.yaml en tu hub.
+# AJUSTAR: "saj_h1" (nombre de tu hub modbus) y slave si no es 1.
+#
+# Estados que expone (input_select.saj_bateria_estrategia):
+#   Autoconsumo   -> AppMode 0 (SELF_USE). Estado por defecto y de seguridad.
+#   Reposo        -> AppMode 3 + Passive STANDBY: ni carga ni descarga.
+#                    Casa y coche tiran de red, la bateria se conserva.
+#   Cargar de red -> AppMode 3 + Passive CHARGE a la potencia indicada,
+#                    hasta el SOC objetivo; al llegar pasa a Reposo.
+#
+# Solo se escribe en las transiciones (no en bucle) para no desgastar la
+# memoria no volatil del inversor.
+# =====================================================================
+
+input_select:
+  saj_bateria_estrategia:
+    name: SAJ - estrategia bateria
+    options:
+      - Autoconsumo
+      - Reposo
+      - Cargar de red
+    initial: Autoconsumo
+    icon: mdi:home-battery
+
+input_number:
+  saj_carga_red_potencia:
+    name: SAJ - potencia carga desde red
+    min: 100
+    max: 2500
+    step: 100
+    unit_of_measurement: W
+    mode: box
+    icon: mdi:transmission-tower-import
+  saj_soc_objetivo_noche:
+    name: SAJ - SOC objetivo carga nocturna
+    min: 10
+    max: 100
+    step: 5
+    unit_of_measurement: "%"
+    mode: slider
+    icon: mdi:battery-charging-60
+
+template:
+  - sensor:
+      - name: SAJ App Mode
+        unique_id: saj_h1_app_mode
+        state: >
+          {{ {0: 'SELF_USE', 1: 'TIME_OF_USE', 2: 'BACKUP', 3: 'PASSIVE'}
+             .get(states('sensor.saj_app_mode_raw') | int(-1), 'desconocido') }}
+      - name: SAJ Passive Mode
+        unique_id: saj_h1_passive_mode
+        # Mapeo segun PDF SAJ, observado en este equipo (2 = descarga a red).
+        state: >
+          {{ {0: 'STANDBY', 1: 'CHARGE', 2: 'DISCHARGE'}
+             .get(states('sensor.saj_passive_mode_raw') | int(-1), 'desconocido') }}
+
+script:
+  saj_escribir_registro:
+    alias: SAJ - escribir registro (con verificacion)
+    mode: queued
+    fields:
+      address: {description: "Registro en decimal", example: 12871}
+      value: {description: "Valor uint16", example: 0}
+    sequence:
+      - action: modbus.write_register
+        data:
+          hub: saj_h1
+          slave: 1
+          address: "{{ address | int }}"
+          value: "{{ value | int }}"
+      # pequena pausa: el AIO3 no tolera rafagas de peticiones
+      - delay: {seconds: 2}
+
+  saj_modo_autoconsumo:
+    alias: SAJ - Autoconsumo (SELF_USE)
+    sequence:
+      - action: script.saj_escribir_registro
+        data: {address: 12871, value: 0}
+
+  saj_modo_reposo:
+    alias: SAJ - Bateria en reposo (PASSIVE + STANDBY)
+    sequence:
+      - action: script.saj_escribir_registro
+        data: {address: 13878, value: 0}
+      - action: script.saj_escribir_registro
+        data: {address: 12871, value: 3}
+
+  saj_modo_cargar_red:
+    alias: SAJ - Cargar bateria de red (PASSIVE + CHARGE)
+    sequence:
+      - action: script.saj_escribir_registro
+        data:
+          address: 13879
+          value: "{{ states('input_number.saj_carga_red_potencia') | int(1000) }}"
+      - action: script.saj_escribir_registro
+        data: {address: 13878, value: 1}   # 1 = CHARGE (2 descargo a red en la prueba)
+      - action: script.saj_escribir_registro
+        data: {address: 12871, value: 3}
+
+automation:
+  - id: saj_aplicar_estrategia
+    alias: SAJ - aplicar estrategia seleccionada
+    mode: restart
+    triggers:
+      - trigger: state
+        entity_id: input_select.saj_bateria_estrategia
+    actions:
+      - choose:
+          - conditions: "{{ trigger.to_state.state == 'Autoconsumo' }}"
+            sequence: [{action: script.saj_modo_autoconsumo}]
+          - conditions: "{{ trigger.to_state.state == 'Reposo' }}"
+            sequence: [{action: script.saj_modo_reposo}]
+          - conditions: "{{ trigger.to_state.state == 'Cargar de red' }}"
+            sequence: [{action: script.saj_modo_cargar_red}]
+
+  - id: saj_fin_carga_por_soc
+    alias: SAJ - SOC objetivo alcanzado -> reposo
+    triggers:
+      - trigger: template
+        value_template: >
+          {{ states('sensor.saj_battery_soc') | float(0)
+             >= states('input_number.saj_soc_objetivo_noche') | float(100) }}
+    conditions:
+      - condition: state
+        entity_id: input_select.saj_bateria_estrategia
+        state: Cargar de red
+    actions:
+      - action: input_select.select_option
+        target: {entity_id: input_select.saj_bateria_estrategia}
+        data: {option: Reposo}
+
+  # --- Red de seguridad: si HA o la automatizacion fallan, el inversor se
+  # --- queda en el ultimo modo escrito. Volver siempre a autoconsumo.
+  - id: saj_failsafe_08h
+    alias: SAJ - failsafe fin de valle -> autoconsumo
+    triggers:
+      - trigger: time
+        at: "08:00:00"
+    actions:
+      - action: input_select.select_option
+        target: {entity_id: input_select.saj_bateria_estrategia}
+        data: {option: Autoconsumo}
+
+  - id: saj_failsafe_arranque
+    alias: SAJ - arranque HA -> autoconsumo
+    triggers:
+      - trigger: homeassistant
+        event: start
+    actions:
+      - delay: {seconds: 60}
+      - action: script.saj_modo_autoconsumo
+
+  - id: saj_aviso_modo_no_aplicado
+    alias: SAJ - aviso si el modo leido no coincide
+    triggers:
+      - trigger: state
+        entity_id: input_select.saj_bateria_estrategia
+        for: {minutes: 2}
+    conditions:
+      - condition: template
+        value_template: >
+          {% set esperado = {'Autoconsumo': 'SELF_USE', 'Reposo': 'PASSIVE',
+                             'Cargar de red': 'PASSIVE'}[trigger.to_state.state] %}
+          {{ states('sensor.saj_app_mode') != esperado }}
+    actions:
+      - action: persistent_notification.create
+        data:
+          title: SAJ H1
+          message: >
+            Estrategia '{{ trigger.to_state.state }}' pero el inversor reporta
+            AppMode={{ states('sensor.saj_app_mode') }} /
+            Passive={{ states('sensor.saj_passive_mode') }}. Revisar log de modbus.

@@ -27,7 +27,7 @@ from .const import (
     CONF_MQTT_PASSWORD,
     DEFAULT_CONFIG_SCHEMA,
 )
-from . import modbus_readers
+from . import modbus_readers, models
 from .modbus_utils import (
     try_read_registers,
     try_write_registers,
@@ -136,6 +136,10 @@ _READER_GROUPS = [
     ],
     [modbus_readers.read_charge_data, modbus_readers.read_discharge_data],
 ]
+
+# H1 series: same groups plus the real AppMode register, read last so it
+# overrides the 0x3647 value from the passive block.
+_READER_GROUPS_H1 = _READER_GROUPS + [[modbus_readers.read_h1_app_mode_data]]
 
 
 class SAJModbusHub(DataUpdateCoordinator[dict[str, Any]]):
@@ -334,6 +338,18 @@ class SAJModbusHub(DataUpdateCoordinator[dict[str, Any]]):
     async def _set_passive_mode(self, value: int | None) -> None:
         self._set_power_state(value, "set_passive_mode")
 
+    @property
+    def is_h1(self) -> bool:
+        """True when the connected inverter is an H1 series device."""
+        return models.is_h1(self.inverter_data)
+
+    @property
+    def passive_mode_targets(self) -> dict[str, int]:
+        """0x3636 values for the passive charge/discharge switches."""
+        if self.is_h1:
+            return models.PASSIVE_MODE_TARGETS_H1
+        return models.PASSIVE_MODE_TARGETS_H2
+
     async def process_pending_now(self) -> None:
         """Immediately process pending settings."""
         try:
@@ -469,7 +485,10 @@ class SAJModbusHub(DataUpdateCoordinator[dict[str, Any]]):
             if self._inverter_static_data:
                 new_cache.update(self._inverter_static_data)
 
-            for group in _READER_GROUPS:
+            reader_groups = (
+                _READER_GROUPS_H1 if models.is_h1(new_cache) else _READER_GROUPS
+            )
+            for group in reader_groups:
                 for method in group:
                     if method in self._permanently_failed_blocks:
                         continue

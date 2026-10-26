@@ -1012,3 +1012,25 @@ async def read_side_net_data(client: ModbusTcpClient, lock: Lock) -> DataDict:
 async def read_inverter_settings_data(client: ModbusTcpClient, lock: Lock) -> DataDict:
     """Reads inverter/battery setpoint registers (0x4023-0x4030)."""
     return await _read_configured_data(client, lock, "inverter_settings")
+
+
+H1_APP_MODE_DATA_MAP = [("AppMode", "16u", 1)]
+
+
+async def read_h1_app_mode_data(client: ModbusTcpClient, lock: Lock) -> DataDict:
+    """Reads the H1 application mode (0x3247).
+
+    Must run after read_passive_battery_data: on the H1 that block also yields an
+    'AppMode' key from 0x3647, which always reads 0 there and is overridden here.
+    """
+    data, errors = await _read_modbus_data(
+        client,
+        lock,
+        0x3247,
+        1,
+        H1_APP_MODE_DATA_MAP,
+        "h1_app_mode",
+        default_factor=1,
+    )
+    _log_partial_errors("h1_app_mode", errors, logging.ERROR)
+    return data

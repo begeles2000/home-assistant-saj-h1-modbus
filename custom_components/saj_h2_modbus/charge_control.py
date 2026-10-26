@@ -16,6 +16,7 @@ from homeassistant.helpers.event import async_call_later
 if TYPE_CHECKING:
     from .hub import SAJModbusHub
 
+from . import models
 from .utils import create_logged_task
 
 _LOGGER = logging.getLogger(__name__)
@@ -406,9 +407,18 @@ class ChargeSettingHandler:
             _LOGGER.error("Invalid simple setting key: %s", key)
             return
 
-        setting_def = MODBUS_ADDRESSES["simple_settings"].get(key)
+        setting_def = self._simple_setting(key)
         if not setting_def:
             _LOGGER.warning("Unknown simple setting: %s", key)
+            return
+
+        if self.hub.is_h1 and key in models.H1_UNSUPPORTED_SETTINGS:
+            _LOGGER.warning(
+                "%s is not supported on SAJ H1 inverters (register 0x%04X unused); "
+                "write skipped",
+                setting_def["label"],
+                setting_def["address"],
+            )
             return
 
         # Special handling for passive_charge_enable if it comes through simple settings
@@ -688,6 +698,13 @@ class ChargeSettingHandler:
         self._last_flush_time = time.monotonic()
         self.hub.async_set_updated_data(self.hub.inverter_data)
 
+    def _simple_setting(self, key: str) -> dict[str, Any] | None:
+        """Return the register definition for a simple setting, per inverter model."""
+        setting_def = MODBUS_ADDRESSES["simple_settings"].get(key)
+        if setting_def and key == "app_mode" and self.hub.is_h1:
+            return {**setting_def, "address": models.H1_APP_MODE_ADDRESS}
+        return setting_def
+
     def _coerce_int(self, value: Any, key: str) -> int | None:
         """Convert value to int with consistent logging on failure."""
         try:
@@ -757,7 +774,7 @@ class ChargeSettingHandler:
         if not force and current_app_mode == desired_app_mode:
             return
 
-        addr = MODBUS_ADDRESSES["simple_settings"]["app_mode"]["address"]
+        addr = self._simple_setting("app_mode")["address"]
         if await self._write_register_with_backoff(
             addr, desired_app_mode, f"AppMode ({reason})"
         ):
