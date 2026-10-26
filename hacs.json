@@ -1,5 +1,5 @@
 {
-    "name": "SAJ H2 Inverter Modbus",
+    "name": "SAJ H1/H2 Inverter Modbus (H1 fork)",
     "homeassistant": "2025.2.4",
     "hacs": "2.0.1"
 }

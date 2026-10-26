@@ -4,6 +4,42 @@
 
 # SAJ H2 Inverter Modbus - A Home Assistant integration for SAJ H2 Inverters
 
+> ## Fork with SAJ H1 support
+>
+> This is a fork of [stanus74/home-assistant-saj-h2-modbus](https://github.com/stanus74/home-assistant-saj-h2-modbus)
+> that adds support for the single-phase **SAJ H1 series** (tested on an **H1-5K-S2** with the AIO3 WiFi module).
+> Everything else (sensors, switches, cards, MQTT) is unchanged, and H2/HS2/HS3 inverters behave exactly as upstream.
+>
+> **Why:** the H1 answers almost all H2 read blocks, but keeps its application mode (AppMode) in register
+> `0x3247`. On the H1, `0x3647` always reads `0` and writing it has no effect, so with the upstream integration
+> the mode, charging/discharging and passive switches did nothing on an H1.
+>
+> **What this fork changes (only when an H1 is detected):**
+>
+> | | H2 (upstream) | H1 (this fork) |
+> |---|---|---|
+> | Detection | — | Automatic: device type `0x54` (register `0x8F00`) or serial number starting with `H1` |
+> | AppMode read/write | `0x3647` | `0x3247` (0 Self-use, 1 Time-of-use, 2 Backup, 3 Passive) |
+> | Passive Charge / Discharge switch (`0x3636`) | 2 / 1 | 1 / 2 (as in the SAJ protocol; 2 verified to discharge) |
+> | Discharge depths, battery/grid power limits (`0x3644`-`0x3646`, `0x364D`-`0x3650`) | writable | writes refused (registers unused on H1) |
+> | Device model shown | SAJ H2 | SAJ H1 |
+>
+> The domain (`saj_h2_modbus`) and all entity unique IDs are kept, so existing entities, dashboards and
+> automations keep working when replacing the upstream integration with this fork.
+>
+> **Status / still to verify on H1:** `0x3636 = 1` actually charging the battery; whether passive powers
+> (`0x3637`-`0x363A`) are watts on H1 (upstream treats them as per-mille of rated power); one AIO3 module locked
+> up (Modbus exception 2 on every register until power-cycled) right after switching to passive mode.
+>
+> **Only one Modbus TCP client at a time:** the AIO3 module mixes responses between simultaneous clients and
+> rejects the second one. Do not run this integration together with another Modbus client (YAML hub, scripts, ...).
+>
+> `h1-tools/` contains a read-only register probe and test scripts used to map the H1 registers.
+>
+> **Install via HACS:** HACS → ⋮ → Custom repositories → add `https://github.com/begeles2000/home-assistant-saj-h1-modbus`
+> (category *Integration*), install it and remove/disable the upstream *SAJ H2 Inverter Modbus* to avoid two copies
+> of the same domain.
+
 Integration for reading data from SAJ Inverters through Modbus TCP.
 
 It should work for Ampere Solar Inverter (EKD-Solar) too. They use SAJ HS2 Inverter.
