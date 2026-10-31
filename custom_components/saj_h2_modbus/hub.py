@@ -14,6 +14,7 @@ from homeassistant.const import CONF_HOST, CONF_PORT, CONF_SCAN_INTERVAL, EVENT_
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.helpers.event import async_track_time_interval, async_call_later
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.helpers.storage import Store
 
 from .const import (
     CONF_FAST_ENABLED,
@@ -272,6 +273,18 @@ class SAJModbusHub(DataUpdateCoordinator[dict[str, Any]]):
 
         self._inverter_static_data: dict[str, Any] | None = None
         self._inverter_static_data_loaded_at: float | None = None
+
+        # H1 detection needs the static block (0x8F00). If that read fails at
+        # startup, the H1-only entities would be skipped for the whole session,
+        # so the detected family is remembered across restarts.
+        self._model_store: Store = Store(
+            self.hass, 1, f"saj_h2_modbus.{self._config_entry.entry_id}.model"
+        )
+        self._known_h1 = False
+
+        # Set while every block is being rejected at once (see
+        # _run_reader_methods), so the warning is logged once per episode.
+        self._device_rejecting_all = False
         self._warned_missing_states: bool = False
 
         # Block-exclusion tracking: counts consecutive unsupported responses per
@@ -351,7 +364,26 @@ class SAJModbusHub(DataUpdateCoordinator[dict[str, Any]]):
     @property
     def is_h1(self) -> bool:
         """True when the connected inverter is an H1 series device."""
-        return models.is_h1(self.inverter_data)
+        return self._known_h1 or models.is_h1(self.inverter_data)
+
+    async def async_load_known_model(self) -> None:
+        """Load the model family detected on a previous run."""
+        try:
+            stored = await self._model_store.async_load()
+        except Exception as e:
+            _LOGGER.warning("Could not load stored inverter model: %s", e)
+            return
+        self._known_h1 = bool(stored and stored.get("h1"))
+
+    async def _remember_h1(self) -> None:
+        """Persist that this entry is an H1, once."""
+        if self._known_h1:
+            return
+        self._known_h1 = True
+        try:
+            await self._model_store.async_save({"h1": True})
+        except Exception as e:
+            _LOGGER.warning("Could not store inverter model: %s", e)
 
     async def set_battery_mode(self, mode: str) -> None:
         """Switch the H1 battery mode (see models.BATTERY_MODES)."""
@@ -491,24 +523,38 @@ class SAJModbusHub(DataUpdateCoordinator[dict[str, Any]]):
                 > _STATIC_DATA_TTL
             )
             if _static_expired:
+                # On failure keep the previous static data and retry next cycle
+                # instead of caching nothing for a whole TTL.
                 try:
-                    self._inverter_static_data = (
-                        await modbus_readers.read_modbus_inverter_data(
-                            client, self._read_lock
-                        )
+                    static = await modbus_readers.read_modbus_inverter_data(
+                        client, self._read_lock
                     )
-                    self._inverter_static_data_loaded_at = time.monotonic()
+                except ReconnectionNeededError:
+                    raise
                 except Exception as e:
                     _LOGGER.error("Failed to load static data: %s", e)
-                    self._inverter_static_data = {}
+                    static = {}
+                if static:
+                    self._inverter_static_data = static
                     self._inverter_static_data_loaded_at = time.monotonic()
+                    if models.is_h1(static):
+                        await self._remember_h1()
 
             if self._inverter_static_data:
                 new_cache.update(self._inverter_static_data)
 
             reader_groups = (
-                _READER_GROUPS_H1 if models.is_h1(new_cache) else _READER_GROUPS
+                _READER_GROUPS_H1
+                if self._known_h1 or models.is_h1(new_cache)
+                else _READER_GROUPS
             )
+            # Blocks rejected as unsupported this cycle. They only count towards
+            # permanent exclusion if some other block answered: when the device
+            # rejects everything at once (seen on an AIO3 module that locked up
+            # and answered exception 2 to every register), that is a device
+            # fault, and excluding every block would stop polling for good.
+            rejected: list[tuple[Any, BlockUnsupportedError]] = []
+            any_block_ok = False
             for group in reader_groups:
                 for method in group:
                     if method in self._permanently_failed_blocks:
@@ -523,6 +569,7 @@ class SAJModbusHub(DataUpdateCoordinator[dict[str, Any]]):
                                 self._block_keys[method.__name__] = set(res)
                         # Clear any previous failure streak on success
                         self._block_failure_counts.pop(method.__name__, None)
+                        any_block_ok = True
                     except CircuitBreakerOpenError:
                         # The breaker is open: every remaining reader would be
                         # rejected the same way, so end the cycle here. No
@@ -541,33 +588,26 @@ class SAJModbusHub(DataUpdateCoordinator[dict[str, Any]]):
                         await self.connection.reconnect()
                         raise
                     except BlockUnsupportedError as e:
-                        count = self._block_failure_counts.get(method.__name__, 0) + 1
-                        self._block_failure_counts[method.__name__] = count
-                        if count >= _BLOCK_PERMANENT_FAILURE_THRESHOLD:
-                            self._permanently_failed_blocks.add(method)
-                            # Values from this block will never be refreshed
-                            # again this session – drop them instead of leaving
-                            # stale readings behind once the merge takes over.
-                            self._stale_keys_to_drop |= self._block_keys.pop(
-                                method.__name__, set()
-                            )
-                            _LOGGER.warning(
-                                "Block %s permanently disabled: not supported by this "
-                                "device firmware. Skipping for the rest of this session. "
-                                "(%s)",
-                                method.__name__,
-                                e,
-                            )
-                        else:
-                            _LOGGER.debug(
-                                "Block %s unsupported by device (failure %d/%d): %s",
-                                method.__name__,
-                                count,
-                                _BLOCK_PERMANENT_FAILURE_THRESHOLD,
-                                e,
-                            )
+                        rejected.append((method, e))
                     except Exception as e:
                         _LOGGER.warning("Reader %s error: %s", method.__name__, e)
+
+            if rejected and not any_block_ok:
+                if not self._device_rejecting_all:
+                    self._device_rejecting_all = True
+                    _LOGGER.warning(
+                        "The device rejected every register block (%s). Treating "
+                        "this as a device/communication fault, not as unsupported "
+                        "blocks: nothing is excluded and polling continues. If it "
+                        "persists, power-cycle the WiFi/Modbus module.",
+                        rejected[0][1],
+                    )
+            else:
+                if self._device_rejecting_all:
+                    self._device_rejecting_all = False
+                    _LOGGER.warning("The device is answering register reads again.")
+                for method, e in rejected:
+                    self._count_unsupported_block(method, e)
 
             return new_cache
         finally:
@@ -578,6 +618,32 @@ class SAJModbusHub(DataUpdateCoordinator[dict[str, Any]]):
                     "Circuit breaker context reset skipped in _run_reader_methods "
                     "(task cancelled?)"
                 )
+
+    def _count_unsupported_block(self, method: Any, e: BlockUnsupportedError) -> None:
+        """Count an unsupported response; exclude the block at the threshold."""
+        count = self._block_failure_counts.get(method.__name__, 0) + 1
+        self._block_failure_counts[method.__name__] = count
+        if count >= _BLOCK_PERMANENT_FAILURE_THRESHOLD:
+            self._permanently_failed_blocks.add(method)
+            # Values from this block will never be refreshed again this
+            # session – drop them instead of leaving stale readings behind
+            # once the merge takes over.
+            self._stale_keys_to_drop |= self._block_keys.pop(method.__name__, set())
+            _LOGGER.warning(
+                "Block %s permanently disabled: not supported by this "
+                "device firmware. Skipping for the rest of this session. "
+                "(%s)",
+                method.__name__,
+                e,
+            )
+        else:
+            _LOGGER.debug(
+                "Block %s unsupported by device (failure %d/%d): %s",
+                method.__name__,
+                count,
+                _BLOCK_PERMANENT_FAILURE_THRESHOLD,
+                e,
+            )
 
     # --- FAST POLLING ---
 
